@@ -1,0 +1,14 @@
+# GitHub Pages configuration
+title: Stock Market Prediction Game
+description: Test your market prediction skills with real stock data
+theme: minima
+
+# Enable GitHub Pages
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+
+# Exclude files from processing
+exclude:
+  - README.md
+  - .gitignore
