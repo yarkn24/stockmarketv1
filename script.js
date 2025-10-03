@@ -1,43 +1,65 @@
+// Stock Market Prediction Game
 class StockPredictionGame {
     constructor() {
-        this.apiKey = '90DOAU73O51BZ16I';
-        this.baseUrl = 'https://www.alphavantage.co/query';
-        this.stockData = null;
-        this.currentStock = '';
-        this.gameData = [];
-        this.currentDateIndex = 0;
+        this.API_KEY = '90DOAU73O51BZ16I';
+        this.BASE_URL = 'https://www.alphavantage.co/query';
+        this.stockData = [];
+        this.currentDataIndex = 0;
         this.score = 0;
+        this.currentSymbol = '';
         this.chart = null;
-        this.startDate = null;
-        this.currentDate = null;
         
         this.initializeEventListeners();
     }
 
     initializeEventListeners() {
-        document.getElementById('submitTicker').addEventListener('click', () => this.handleStockSubmit());
+        document.getElementById('startGameBtn').addEventListener('click', () => this.startGame());
         document.getElementById('stockTicker').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.handleStockSubmit();
+            if (e.key === 'Enter') this.startGame();
         });
-        document.getElementById('predictUp').addEventListener('click', () => this.makePrediction('up'));
-        document.getElementById('predictDown').addEventListener('click', () => this.makePrediction('down'));
-        document.getElementById('continueGame').addEventListener('click', () => this.continueGame());
-        document.getElementById('newGame').addEventListener('click', () => this.resetGame());
+        document.getElementById('predictUp').addEventListener('click', () => this.makePrediction(true));
+        document.getElementById('predictDown').addEventListener('click', () => this.makePrediction(false));
+        document.getElementById('continueBtn').addEventListener('click', () => this.continueGame());
+        document.getElementById('newGameBtn').addEventListener('click', () => this.resetGame());
     }
 
-    async handleStockSubmit() {
+    async startGame() {
         const ticker = document.getElementById('stockTicker').value.trim().toUpperCase();
+        
         if (!ticker) {
             this.showError('Please enter a stock ticker symbol');
             return;
         }
-
+        
         this.showLoading(true);
         this.clearError();
-
+        
         try {
-            await this.fetchStockData(ticker);
-            this.initializeGame();
+            const stockData = await this.fetchStockData(ticker);
+            
+            if (!stockData || stockData.length < 8) { // Need at least 7 historical days + 1 start day
+                throw new Error('Not enough historical data to start the game.');
+            }
+            
+            this.stockData = stockData;
+            this.currentSymbol = ticker;
+            this.score = 0;
+            
+            // New logic: Find a valid starting date from the data we actually have
+            const potentialStartIndices = this.getPotentialStartIndices();
+
+            if (potentialStartIndices.length === 0) {
+                throw new Error('Not enough historical data in the last 7-100 day range for this stock.');
+            }
+
+            // Pick a random index from our list of valid indices
+            const randomIndex = Math.floor(Math.random() * potentialStartIndices.length);
+            this.currentDataIndex = potentialStartIndices[randomIndex];
+            
+            this.initializeGameInterface();
+            this.createChart();
+            this.showGameSection();
+            
         } catch (error) {
             this.showError(error.message);
         } finally {
@@ -45,187 +67,101 @@ class StockPredictionGame {
         }
     }
 
-    async fetchStockData(ticker) {
+    async fetchStockData(symbol) {
+        const url = `${this.BASE_URL}?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${this.API_KEY}&outputsize=full`;
+        
         try {
-            // First, try to get company overview to validate ticker
-            const overviewUrl = `${this.baseUrl}?function=OVERVIEW&symbol=${ticker}&apikey=${this.apiKey}`;
-            const overviewResponse = await fetch(overviewUrl);
-            const overviewData = await overviewResponse.json();
-
-            if (overviewData['Error Message'] || !overviewData.Symbol) {
-                throw new Error(`Invalid stock ticker: ${ticker}. Please enter a valid stock symbol.`);
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data['Error Message']) {
+                throw new Error('Invalid stock ticker symbol');
             }
-
-            // Get daily time series data
-            const timeSeriesUrl = `${this.baseUrl}?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${this.apiKey}&outputsize=full`;
-            const timeSeriesResponse = await fetch(timeSeriesUrl);
-            const timeSeriesData = await timeSeriesResponse.json();
-
-            if (timeSeriesData['Error Message']) {
-                throw new Error(timeSeriesData['Error Message']);
+            
+            if (data['Note']) {
+                throw new Error('API rate limit exceeded. Please try again later.');
             }
-
-            if (timeSeriesData['Note']) {
-                throw new Error('API call frequency limit reached. Please try again in a minute.');
-            }
-
-            const timeSeries = timeSeriesData['Time Series (Daily)'];
+            
+            const timeSeries = data['Time Series (Daily)'];
             if (!timeSeries) {
-                throw new Error('No stock data available for this ticker.');
+                throw new Error('No stock data available');
             }
-
-            this.stockData = {
-                symbol: ticker,
-                name: overviewData.Name || ticker,
-                timeSeries: timeSeries
-            };
-
-            this.currentStock = ticker;
+            
+            // Convert to array and sort by date
+            const stockArray = Object.entries(timeSeries).map(([date, values]) => ({
+                date: new Date(date),
+                open: parseFloat(values['1. open']),
+                high: parseFloat(values['2. high']),
+                low: parseFloat(values['3. low']),
+                close: parseFloat(values['4. close']),
+                volume: parseInt(values['5. volume'])
+            })).sort((a, b) => a.date - b.date);
+            
+            return stockArray;
+            
         } catch (error) {
-            throw new Error(error.message || 'Failed to fetch stock data. Please try again.');
+            console.error('Error fetching stock data:', error);
+            throw error;
         }
     }
 
-    generateRandomStartDate() {
+    getPotentialStartIndices() {
         const today = new Date();
-        const minDaysAgo = 7; // At least 1 week ago
-        const maxDaysAgo = 100; // Not more than 100 days ago
-        
-        let attempts = 0;
-        let randomDate;
-        
-        do {
-            const daysAgo = Math.floor(Math.random() * (maxDaysAgo - minDaysAgo + 1)) + minDaysAgo;
-            randomDate = new Date(today);
-            randomDate.setDate(today.getDate() - daysAgo);
-            attempts++;
-        } while (this.isWeekendOrHoliday(randomDate) && attempts < 50);
-        
-        return randomDate;
+        const minStartDate = new Date();
+        minStartDate.setDate(today.getDate() - 100);
+        const maxStartDate = new Date();
+        maxStartDate.setDate(today.getDate() - 7);
+
+        const potentialIndices = [];
+        // Start from index 7 so we always have 7 days of prior data for the chart
+        for (let i = 7; i < this.stockData.length; i++) {
+            const date = this.stockData[i].date;
+            if (date >= minStartDate && date <= maxStartDate) {
+                potentialIndices.push(i);
+            }
+        }
+        return potentialIndices;
     }
 
-    isWeekendOrHoliday(date) {
-        const dayOfWeek = date.getDay();
-        // 0 = Sunday, 6 = Saturday
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-            return true;
-        }
-        
-        // Basic holiday check (you could expand this)
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
-        
-        // New Year's Day
-        if (month === 1 && day === 1) return true;
-        // Independence Day
-        if (month === 7 && day === 4) return true;
-        // Christmas
-        if (month === 12 && day === 25) return true;
-        
-        return false;
-    }
-
-    prepareGameData() {
-        const timeSeries = this.stockData.timeSeries;
-        const dates = Object.keys(timeSeries).sort();
-        
-        // Find the start date in our data
-        const startDateStr = this.formatDateForAPI(this.startDate);
-        let startIndex = dates.findIndex(date => date <= startDateStr);
-        
-        if (startIndex === -1) {
-            // If exact date not found, find the closest earlier date
-            startIndex = 0;
-        }
-        
-        // We need 7 days before the start date for initial display
-        const requiredDays = 8; // 7 days before + start date
-        if (startIndex < requiredDays - 1) {
-            throw new Error('Not enough historical data for this date range.');
-        }
-        
-        // Get the data we need
-        this.gameData = [];
-        for (let i = startIndex - 7; i <= startIndex; i++) {
-            const date = dates[i];
-            const data = timeSeries[date];
-            this.gameData.push({
-                date: date,
-                open: parseFloat(data['1. open']),
-                high: parseFloat(data['2. high']),
-                low: parseFloat(data['3. low']),
-                close: parseFloat(data['4. close']),
-                volume: parseInt(data['5. volume'])
-            });
-        }
-        
-        // Set current date index to the last item (start date)
-        this.currentDateIndex = this.gameData.length - 1;
-        this.currentDate = new Date(this.gameData[this.currentDateIndex].date);
-        
-        // Prepare additional data for future predictions
-        this.futureData = [];
-        for (let i = startIndex + 1; i < Math.min(startIndex + 31, dates.length); i++) {
-            const date = dates[i];
-            const data = timeSeries[date];
-            this.futureData.push({
-                date: date,
-                open: parseFloat(data['1. open']),
-                high: parseFloat(data['2. high']),
-                low: parseFloat(data['3. low']),
-                close: parseFloat(data['4. close']),
-                volume: parseInt(data['5. volume'])
-            });
-        }
-    }
-
-    formatDateForAPI(date) {
-        return date.toISOString().split('T')[0];
-    }
-
-    initializeGame() {
-        this.startDate = this.generateRandomStartDate();
-        this.prepareGameData();
-        
-        // Update UI
-        document.getElementById('stockInputSection').style.display = 'none';
-        document.getElementById('gameInterface').style.display = 'block';
-        document.getElementById('stockSymbol').textContent = this.stockData.symbol;
-        document.getElementById('stockName').textContent = this.stockData.name;
-        document.getElementById('currentScore').textContent = this.score;
-        document.getElementById('currentDate').textContent = this.formatDisplayDate(this.currentDate);
-        
-        this.createChart();
-        this.showPredictionSection();
+    initializeGameInterface() {
+        document.getElementById('stockSymbol').textContent = this.currentSymbol;
+        document.getElementById('currentDate').textContent = this.formatDate(this.stockData[this.currentDataIndex].date);
+        document.getElementById('scoreValue').textContent = this.score;
+        document.getElementById('resultSection').style.display = 'none';
+        this.enablePredictionButtons();
     }
 
     createChart() {
         const ctx = document.getElementById('stockChart').getContext('2d');
         
+        // Get data for chart (7 days before and including current date)
+        const startIndex = Math.max(0, this.currentDataIndex - 6);
+        const endIndex = this.currentDataIndex;
+        const chartData = this.stockData.slice(startIndex, endIndex + 1);
+        
+        const labels = chartData.map(item => this.formatDate(item.date));
+        const prices = chartData.map(item => item.close);
+        
         if (this.chart) {
             this.chart.destroy();
         }
-        
-        const labels = this.gameData.map(item => this.formatDisplayDate(new Date(item.date)));
-        const data = this.gameData.map(item => item.close);
         
         this.chart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: `${this.stockData.symbol} Stock Price`,
-                    data: data,
+                    label: `${this.currentSymbol} Stock Price`,
+                    data: prices,
                     borderColor: '#667eea',
                     backgroundColor: 'rgba(102, 126, 234, 0.1)',
                     borderWidth: 3,
                     fill: true,
                     tension: 0.4,
                     pointBackgroundColor: '#667eea',
-                    pointBorderColor: '#fff',
+                    pointBorderColor: '#ffffff',
                     pointBorderWidth: 2,
-                    pointRadius: 6,
-                    pointHoverRadius: 8
+                    pointRadius: 6
                 }]
             },
             options: {
@@ -235,10 +171,6 @@ class StockPredictionGame {
                     legend: {
                         display: true,
                         position: 'top'
-                    },
-                    title: {
-                        display: true,
-                        text: `Stock Price History - Current Date: ${this.formatDisplayDate(this.currentDate)}`
                     }
                 },
                 scales: {
@@ -248,150 +180,136 @@ class StockPredictionGame {
                             display: true,
                             text: 'Price ($)'
                         },
-                        grid: {
-                            color: 'rgba(0,0,0,0.1)'
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
                         }
                     },
                     x: {
                         title: {
                             display: true,
                             text: 'Date'
-                        },
-                        grid: {
-                            color: 'rgba(0,0,0,0.1)'
                         }
                     }
                 },
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
+                elements: {
+                    point: {
+                        hoverRadius: 8
+                    }
                 }
             }
         });
     }
 
-    formatDisplayDate(date) {
-        return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    }
-
-    showPredictionSection() {
-        document.getElementById('predictionSection').style.display = 'block';
-        document.getElementById('resultSection').style.display = 'none';
-    }
-
-    async makePrediction(direction) {
-        if (this.futureData.length === 0) {
-            this.showError('No more data available for predictions.');
+    makePrediction(predictUp) {
+        if (this.currentDataIndex >= this.stockData.length - 1) {
+            this.showError('No more data available for predictions');
             return;
         }
-
-        const currentPrice = this.gameData[this.currentDateIndex].close;
-        const nextDayData = this.futureData[0];
-        const nextPrice = nextDayData.close;
         
-        const actualDirection = nextPrice > currentPrice ? 'up' : 'down';
-        const isCorrect = direction === actualDirection;
+        const currentPrice = this.stockData[this.currentDataIndex].close;
+        const nextPrice = this.stockData[this.currentDataIndex + 1].close;
+        const actualUp = nextPrice > currentPrice;
+        const isCorrect = predictUp === actualUp;
         
         if (isCorrect) {
             this.score++;
         }
         
-        // Update game data with next day
-        this.gameData.push(nextDayData);
-        this.futureData.shift();
-        this.currentDateIndex++;
-        this.currentDate = new Date(nextDayData.date);
-        
-        // Update UI
-        document.getElementById('currentScore').textContent = this.score;
-        document.getElementById('currentDate').textContent = this.formatDisplayDate(this.currentDate);
-        
-        // Update chart
+        this.currentDataIndex++;
+        this.showResult(isCorrect, nextPrice, predictUp, actualUp);
         this.updateChart();
+        this.disablePredictionButtons();
+    }
+
+    showResult(isCorrect, actualPrice, predictedUp, actualUp) {
+        const resultSection = document.getElementById('resultSection');
+        const resultMessage = document.getElementById('resultMessage');
+        const actualPriceElement = document.getElementById('actualPrice');
         
-        // Show result
-        this.showResult(isCorrect, currentPrice, nextPrice, actualDirection);
+        resultMessage.className = 'result-message ' + (isCorrect ? 'correct' : 'incorrect');
+        
+        if (isCorrect) {
+            resultMessage.textContent = '🎉 Correct! Well done!';
+        } else {
+            const actualDirection = actualUp ? 'UP' : 'DOWN';
+            const predictedDirection = predictedUp ? 'UP' : 'DOWN';
+            resultMessage.textContent = `❌ Incorrect. You predicted ${predictedDirection}, but price went ${actualDirection}.`;
+        }
+        
+        actualPriceElement.textContent = actualPrice.toFixed(2);
+        
+        // Update score display
+        document.getElementById('scoreValue').textContent = this.score;
+        
+        // Update current date
+        document.getElementById('currentDate').textContent = this.formatDate(this.stockData[this.currentDataIndex].date);
+        
+        resultSection.style.display = 'block';
     }
 
     updateChart() {
-        const newLabel = this.formatDisplayDate(new Date(this.gameData[this.currentDateIndex].date));
-        const newPrice = this.gameData[this.currentDateIndex].close;
+        // Add new data point to chart
+        const newData = this.stockData[this.currentDataIndex];
+        this.chart.data.labels.push(this.formatDate(newData.date));
+        this.chart.data.datasets[0].data.push(newData.close);
         
-        this.chart.data.labels.push(newLabel);
-        this.chart.data.datasets[0].data.push(newPrice);
-        
-        // Keep only last 10 data points for better visibility
-        if (this.chart.data.labels.length > 10) {
+        // Keep only last 8 points (7 historical + 1 new)
+        if (this.chart.data.labels.length > 8) {
             this.chart.data.labels.shift();
             this.chart.data.datasets[0].data.shift();
         }
         
-        this.chart.options.plugins.title.text = `Stock Price History - Current Date: ${this.formatDisplayDate(this.currentDate)}`;
         this.chart.update();
     }
 
-    showResult(isCorrect, oldPrice, newPrice, actualDirection) {
-        const resultMessage = document.getElementById('resultMessage');
-        const priceChange = ((newPrice - oldPrice) / oldPrice * 100).toFixed(2);
-        const priceChangeText = priceChange >= 0 ? `+${priceChange}%` : `${priceChange}%`;
-        
-        if (isCorrect) {
-            resultMessage.innerHTML = `
-                <div class="correct">✅ Correct!</div>
-                <p>The stock price ${actualDirection === 'up' ? 'increased' : 'decreased'} from $${oldPrice.toFixed(2)} to $${newPrice.toFixed(2)} (${priceChangeText})</p>
-                <p>Your score: ${this.score}</p>
-            `;
-            resultMessage.className = 'result-message correct';
-        } else {
-            resultMessage.innerHTML = `
-                <div class="incorrect">❌ Incorrect!</div>
-                <p>The stock price ${actualDirection === 'up' ? 'increased' : 'decreased'} from $${oldPrice.toFixed(2)} to $${newPrice.toFixed(2)} (${priceChangeText})</p>
-                <p>Your score: ${this.score}</p>
-            `;
-            resultMessage.className = 'result-message incorrect';
+    continueGame() {
+        if (this.currentDataIndex >= this.stockData.length - 1) {
+            alert('Game completed! No more data available.');
+            this.resetGame();
+            return;
         }
         
-        document.getElementById('predictionSection').style.display = 'none';
-        document.getElementById('resultSection').style.display = 'block';
-        
-        // Hide continue button if no more data
-        if (this.futureData.length === 0) {
-            document.getElementById('continueGame').style.display = 'none';
-            resultMessage.innerHTML += '<p><strong>Game Over!</strong> No more data available.</p>';
-        }
+        document.getElementById('resultSection').style.display = 'none';
+        this.enablePredictionButtons();
     }
 
-    continueGame() {
-        this.showPredictionSection();
+    enablePredictionButtons() {
+        document.getElementById('predictUp').disabled = false;
+        document.getElementById('predictDown').disabled = false;
+    }
+
+    disablePredictionButtons() {
+        document.getElementById('predictUp').disabled = true;
+        document.getElementById('predictDown').disabled = true;
     }
 
     resetGame() {
         this.score = 0;
-        this.gameData = [];
-        this.futureData = [];
-        this.currentDateIndex = 0;
-        this.startDate = null;
-        this.currentDate = null;
+        this.stockData = [];
+        this.currentDataIndex = 0;
+        this.currentSymbol = '';
         
         if (this.chart) {
             this.chart.destroy();
             this.chart = null;
         }
         
-        document.getElementById('gameInterface').style.display = 'none';
-        document.getElementById('stockInputSection').style.display = 'block';
+        document.getElementById('tickerSection').style.display = 'block';
+        document.getElementById('gameSection').style.display = 'none';
         document.getElementById('stockTicker').value = '';
-        this.clearError();
+        document.getElementById('stockTicker').focus();
+    }
+
+    showGameSection() {
+        document.getElementById('tickerSection').style.display = 'none';
+        document.getElementById('gameSection').style.display = 'block';
     }
 
     showLoading(show) {
-        document.getElementById('loading').style.display = show ? 'block' : 'none';
-        document.getElementById('submitTicker').disabled = show;
+        document.getElementById('loadingSection').style.display = show ? 'block' : 'none';
+        document.getElementById('tickerSection').style.display = show ? 'none' : 'block';
     }
 
     showError(message) {
@@ -400,6 +318,14 @@ class StockPredictionGame {
 
     clearError() {
         document.getElementById('errorMessage').textContent = '';
+    }
+
+    formatDate(date) {
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
     }
 }
 
