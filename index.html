@@ -3,65 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Test your market prediction skills with real stock data in this interactive game">
+    <meta name="keywords" content="stock market, prediction, game, finance, trading, alpha vantage">
+    <meta name="author" content="Stock Prediction Game">
     <title>Stock Market Prediction Game</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+    <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>📈 Stock Market Prediction Game</h1>
-            <p>Predict if stock prices will go up or down and test your market intuition!</p>
+            <p>Test your market prediction skills with real stock data!</p>
         </header>
 
         <div class="game-section">
-            <!-- Ticker Input Section -->
-            <div class="input-section" id="tickerSection">
+            <!-- Stock Input Section -->
+            <div class="input-section" id="stockInputSection">
                 <h2>Enter Stock Ticker Symbol</h2>
                 <div class="input-group">
-                    <input type="text" id="stockTicker" placeholder="e.g., AAPL, MSFT, GOOGL" maxlength="10">
-                    <button id="startGameBtn">StartT Game</button>
+                    <input type="text" id="stockTicker" placeholder="e.g., MSFT, AAPL, GOOGL" maxlength="10">
+                    <button id="submitTicker">Start Game</button>
                 </div>
                 <div class="error-message" id="errorMessage"></div>
             </div>
 
-            <!-- Game Play Section -->
-            <div class="game-play" id="gameSection" style="display: none;">
-                <div class="game-info">
+            <!-- Game Interface -->
+            <div class="game-interface" id="gameInterface" style="display: none;">
+                <div class="game-header">
                     <div class="stock-info">
                         <h2 id="stockSymbol"></h2>
+                        <p id="stockName"></p>
+                    </div>
+                    <div class="score-info">
+                        <div class="score">Score: <span id="currentScore">0</span></div>
                         <div class="current-date">Current Date: <span id="currentDate"></span></div>
-                        <div class="score">Score: <span id="scoreValue">0</span></div>
                     </div>
                 </div>
 
-                <!-- Chart Section -->
                 <div class="chart-container">
                     <canvas id="stockChart"></canvas>
                 </div>
 
-                <!-- Prediction Section -->
-                <div class="prediction-section">
-                    <h3>What do you predict for tomorrow?</h3>
+                <div class="prediction-section" id="predictionSection">
+                    <h3>What will happen to the stock price tomorrow?</h3>
                     <div class="prediction-buttons">
-                        <button id="predictUp" class="prediction-btn up-btn">📈 Price Will Go UP</button>
-                        <button id="predictDown" class="prediction-btn down-btn">📉 Price Will Go DOWN</button>
+                        <button id="predictUp" class="predict-btn up">📈 Price Will Go Up</button>
+                        <button id="predictDown" class="predict-btn down">📉 Price Will Go Down</button>
                     </div>
                 </div>
 
-                <!-- Result Section -->
                 <div class="result-section" id="resultSection" style="display: none;">
                     <div class="result-message" id="resultMessage"></div>
-                    <div class="actual-price">Actual next day price: $<span id="actualPrice"></span></div>
-                    <button id="continueBtn" class="continue-btn">Continue Game</button>
-                    <button id="newGameBtn" class="new-game-btn">New Game</button>
+                    <button id="continueGame">Continue Game</button>
+                    <button id="newGame">New Game</button>
                 </div>
-            </div>
 
-            <!-- Loading Section -->
-            <div class="loading" id="loadingSection" style="display: none;">
-                <div class="loading-spinner"></div>
-                <p>Loading stock data...</p>
+                <div class="loading" id="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Loading stock data...</p>
+                </div>
             </div>
         </div>
     </div>
