@@ -2,9 +2,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [ CursorTestV1 ]
   pull_request:
-    branches: [ main ]
+    branches: [ CursorTestV1 ]
 
 jobs:
   deploy:
