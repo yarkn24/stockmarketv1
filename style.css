@@ -1,0 +1,310 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    color: white;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+header p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.game-section {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+/* Input Section */
+.input-section {
+    text-align: center;
+}
+
+.input-section h2 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+#stockTicker {
+    padding: 12px 20px;
+    font-size: 1.1rem;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    width: 250px;
+    text-transform: uppercase;
+}
+
+#stockTicker:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+}
+
+#startGameBtn {
+    padding: 12px 25px;
+    font-size: 1.1rem;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+#startGameBtn:hover {
+    background: #5a6fd8;
+}
+
+.error-message {
+    color: #e74c3c;
+    font-weight: 500;
+    min-height: 20px;
+}
+
+/* Game Play Section */
+.game-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.stock-info h2 {
+    font-size: 1.8rem;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.current-date, .score {
+    font-size: 1.1rem;
+    color: #666;
+}
+
+.score {
+    font-weight: 600;
+    color: #27ae60;
+}
+
+/* Chart Section */
+.chart-container {
+    position: relative;
+    height: 400px;
+    margin-bottom: 30px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+}
+
+/* Prediction Section */
+.prediction-section {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.prediction-section h3 {
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.3rem;
+}
+
+.prediction-buttons {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.prediction-btn {
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 200px;
+}
+
+.up-btn {
+    background: #27ae60;
+    color: white;
+}
+
+.up-btn:hover {
+    background: #219a52;
+    transform: translateY(-2px);
+}
+
+.down-btn {
+    background: #e74c3c;
+    color: white;
+}
+
+.down-btn:hover {
+    background: #c0392b;
+    transform: translateY(-2px);
+}
+
+.prediction-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Result Section */
+.result-section {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.result-message {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.result-message.correct {
+    color: #27ae60;
+}
+
+.result-message.incorrect {
+    color: #e74c3c;
+}
+
+.actual-price {
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.continue-btn, .new-game-btn {
+    padding: 12px 25px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin: 0 10px;
+    transition: background 0.3s ease;
+}
+
+.continue-btn {
+    background: #3498db;
+    color: white;
+}
+
+.continue-btn:hover {
+    background: #2980b9;
+}
+
+.new-game-btn {
+    background: #95a5a6;
+    color: white;
+}
+
+.new-game-btn:hover {
+    background: #7f8c8d;
+}
+
+/* Loading Section */
+.loading {
+    text-align: center;
+    padding: 40px;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading p {
+    font-size: 1.1rem;
+    color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+    
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .game-section {
+        padding: 20px;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    #stockTicker {
+        width: 100%;
+        max-width: 300px;
+    }
+    
+    .chart-container {
+        height: 300px;
+    }
+    
+    .prediction-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .prediction-btn {
+        width: 100%;
+        max-width: 300px;
+    }
+}
